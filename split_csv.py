@@ -1,7 +1,7 @@
 import pandas as pd
 
 # Define the number of rows per chunk
-chunksize = 10000 
+chunksize = 5000000 
 cols = [
     "IPV4_SRC_ADDR",
     "L4_SRC_PORT",
@@ -75,5 +75,6 @@ for chunk in chunks:
         # Save the DataFrame to a new CSV file
         df.to_csv(f"{storage_spot}dataset{dataset_number}.csv", index=False)
         print(f'write successfull for: {storage_spot}dataset{dataset_number}.csv')
+        dataset_number +=1 
         
 
