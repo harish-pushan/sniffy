@@ -9,7 +9,7 @@ from sklearn.metrics import classification_report, confusion_matrix
 # 1️⃣ Load dataset
 # ------------------------
 df = pd.read_parquet("nids.parquet")
-
+df.info()
 # ------------------------
 # 2️⃣ Define target
 # ------------------------
