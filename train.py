@@ -11,7 +11,7 @@ import joblib  # for pickle export
 df = pd.read_csv("/mnt/8tb_hdd/harish/ds2/splited/dataset0.csv")
 
 # Drop non-feature columns
-drop_cols = ["IPV4_SRC_ADDR", "IPV4_DST_ADDR", "Dataset"]  # we drop IPs and dataset label
+drop_cols = ["IPV4_SRC_ADDR", "IPV4_DST_ADDR", "Dataset","Attack"]  # we drop IPs and dataset label
 X = df.drop(columns=drop_cols + ["Label"])
 y = df["Label"]
 
