@@ -12,12 +12,12 @@ df = pd.read_csv("/mnt/8tb_hdd/harish/ds2/splited/dataset0.csv")
 # Drop non-feature columns
 drop_cols = ["IPV4_SRC_ADDR", "IPV4_DST_ADDR", "Dataset","Attack"]  # we drop IPs and dataset label
 X = df.drop(columns=drop_cols + ["Label"])
-print("Any inf values after cleaning:", np.isinf(X).any())
-print("Any NaNs after cleaning:", np.isnan(X).any())
+print("\n\nAny inf values before cleaning:", np.isinf(X).any(),"\n\n")
+print("\n\nAny NaNs before cleaning:", np.isnan(X).any(),"\n\n")
 X.replace([np.inf, -np.inf], np.nan, inplace=True)
 X.fillna(0, inplace=True)
-print("Any inf values after cleaning:", np.isinf(X).any())
-print("Any NaNs after cleaning:", np.isnan(X).any())
+print("\n\nAny inf values after cleaning:", np.isinf(X).any(),"\n\n")
+print("\n\nAny NaNs after cleaning:", np.isnan(X).any(),"\n\n")
 y = df["Label"]
 
 # ======================
