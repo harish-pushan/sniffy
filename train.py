@@ -20,8 +20,8 @@ def train_with_chunks(file_list):
         # load data
         df = pd.read_csv(file)
 
-        y = df["Lable"]                 # target
-        X = df.drop(columns=["Lable"])  # ALL features kept
+        y = df["Label"]                 # target
+        X = df.drop(columns=["Label"])  # ALL features kept
 
         # encode y ONLY
         y_enc = le.fit_transform(y)
