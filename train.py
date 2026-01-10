@@ -11,7 +11,7 @@ import joblib  # for saving the model
 df = pd.read_csv("d/mnt/8tb_hdd/harish/ds2/splited/dataset0.csv")
 
 # Drop non-feature columns
-drop_cols = ["IPV4_SRC_ADDR", "IPV4_DST_ADDR", "Dataset"]
+drop_cols = ["IPV4_SRC_ADDR", "IPV4_DST_ADDR", "Dataset","Attack"]
 X = df.drop(columns=drop_cols + ["Label"])
 y = df["Label"]
 
