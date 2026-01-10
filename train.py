@@ -1,14 +1,14 @@
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from xgboost import XGBClassifier
 from sklearn.metrics import classification_report, confusion_matrix
 import joblib
 
 
 def train_with_chunks(file_list):
-    le = LabelEncoder()
+    le = OneHotEncoder(handle_unknown='ignore', sparse_output=False) # sparse_output=False returns a dense array 
     scaler = StandardScaler()
 
     model = None
