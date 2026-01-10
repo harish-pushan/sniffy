@@ -28,6 +28,9 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 X_train = X_train.astype(np.float32)
 X_test = X_test.astype(np.float32)
+X_train = X_train.clip(upper=1e8)
+X_test = X_test.clip(upper=1e8)
+
 # ======================
 # 3. Calculate class imbalance
 # ======================
