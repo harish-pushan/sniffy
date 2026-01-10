@@ -9,7 +9,7 @@ import joblib  # for pickle export
 # 1. Load dataset
 # ======================
 df = pd.read_csv("/mnt/8tb_hdd/harish/ds2/splited/dataset0.csv")
-
+df.replace([np.inf, -np.inf], np.nan, inplace=True)
 # Drop non-feature columns
 drop_cols = ["IPV4_SRC_ADDR", "IPV4_DST_ADDR", "Dataset","Attack"]  # we drop IPs and dataset label
 X = df.drop(columns=drop_cols + ["Label"])
