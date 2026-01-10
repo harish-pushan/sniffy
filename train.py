@@ -5,6 +5,7 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from xgboost import XGBClassifier
 from sklearn.metrics import classification_report, confusion_matrix
 import joblib
+import ipaddress
 
 
 def train_with_chunks(file_list):
@@ -23,6 +24,17 @@ def train_with_chunks(file_list):
         y = df["Label"]                 # target
         X = df.drop(columns=["Label"])  # ALL features kept
 
+        ip_cols = ["IPV4_SRC_ADDR", "IPV4_DST_ADDR"]
+        
+        def ip_to_int(ip):
+            try:
+                return int(ipaddress.IPv4Address(ip))
+            except:
+                return 0
+        
+        for col in ip_cols:
+            df[col] = df[col].astype(str).apply(ip_to_int)
+        
         # encode y ONLY
         y_enc = le.fit_transform(y)
 
