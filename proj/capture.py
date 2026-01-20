@@ -1,56 +1,70 @@
-from scapy.all import sniff 
-from scapy.all import PcapWriter 
-import os 
 
-class Sniffer:
-    def __init__(self,iface):
-        self.iface = iface
-    
-    
-    def tcp_process_packet(self,pkt):
-
-        pkts_writer = PcapWriter('tcp_packet.pcap', append=True, sync=True)
-        """Callback function to write each packet to the file."""
-        try:
-            pkts_writer.write(pkt)
-        except Exception as e:
-            print(f"Error writing packet: {e}")
+from scapy.all import sniff, IP, TCP, UDP
+from scapy.all import get_if_addr
 
 
-    def udp_process_packet(self,pkt):
-
-        pkts_writer = PcapWriter('udp_packet.pcap', append=True, sync=True)
-        """Callback function to write each packet to the file."""
-        try:
-            pkts_writer.write(pkt)
-        except Exception as e:
-            print(f"Error writing packet: {e}")
-    def arp_process_packet(self,pkt):
-
-        pkts_writer = PcapWriter('arp_packet.pcap', append=True, sync=True)
-        """Callback function to write each packet to the file."""
-        try:
-            pkts_writer.write(pkt)
-        except Exception as e:
-            print(f"Error writing packet: {e}")
-    def icmp_process_packet(self,pkt):
-
-        pkts_writer = PcapWriter('icmp_packet.pcap', append=True, sync=True)
-        """Callback function to write each packet to the file."""
-        try:
-            pkts_writer.write(pkt)
-        except Exception as e:
-            print(f"Error writing packet: {e}")
-
-    # This function creates the object and we start the sniffing with something else.....
-    def create_sniffer_obj(self):
-        # Start sniffing
-        # store=0 prevents packets from being stored in memory, 
-        # which is essential for long-running captures
-        sniff(iface = self.iface,prn = self.tcp_process_packet, filter= "tcp",store = 0 )
-        sniff(iface = self.iface,prn = self.udp_process_packet,filter= "udp",store = 0)
-        sniff(iface = self.iface,prn = self.arp_process_packet, filter= "arp", store = 0)
-        sniff(iface = self.iface,prn = self.icmp_process_packet,filter= "icmp", store = 0 )
+def process_data(data):
+    print(data)
 
 
+def func_invoker(packet):
+    get_all_ports_and_IP(packet)
+    get_packet_sizes(packet)
 
+
+def get_all_ports_and_IP(packet):
+    if not packet.haslayer(IP):
+        return
+
+    data = {
+        "src_ip": packet[IP].src,
+        "dst_ip": packet[IP].dst,
+        "proto": "IP",
+        "sport": None,
+        "dport": None
+    }
+
+    if packet.haslayer(TCP):
+        data["proto"] = "TCP"
+        data["sport"] = packet[TCP].sport
+        data["dport"] = packet[TCP].dport
+
+    elif packet.haslayer(UDP):
+        data["proto"] = "UDP"
+        data["sport"] = packet[UDP].sport
+        data["dport"] = packet[UDP].dport
+
+    process_data(data)
+
+
+def get_packet_sizes(packet):
+    my_ip = get_if_addr(interface)
+    if not packet.haslayer(IP):
+        return
+
+    if packet[IP].src == my_ip:
+        data = {
+            "in_bytes": len(packet),
+            "out_bytes": None
+        }
+
+    if packet[IP].dst == my_ip:
+        data = {
+            "in_bytes": None,
+            "out_bytes": len(packet)
+        }
+    process_data(data)
+
+
+interface = "wlan0"
+
+
+
+
+
+
+sniff(
+    iface=interface,
+    prn=func_invoker,
+    store=False
+)
