@@ -1,7 +1,7 @@
 from nfstream import NFStreamer, NFPlugin
 
 
-class MyCustomFeature(NFPlugin):
+class ip_pkt_len_return(NFPlugin):
     def on_init(self, packet, flow):
         """Called when a flow is first created."""
         # Initialize a custom variable on the flow object
@@ -17,6 +17,52 @@ class MyCustomFeature(NFPlugin):
 
     def on_expire(self, flow):
         pass
+
+
+class get_size_pkts(NFPlugin):
+    def on_init(self, packet, flow):
+        """Called when a flow is first created."""
+        # Initialize a custom variable on the flow object
+        flow.udps.NUM_PKTS_UP_TO_128_BYTES = 0
+        flow.udps.NUM_PKTS_128_TO_256_BYTES = 0
+        flow.udps.NUM_PKTS_256_TO_512_BYTES = 0
+        flow.udps.NUM_PKTS_512_TO_1024_BYTES = 0
+        flow.udps.NUM_PKTS_1024_TO_1514_BYTES = 0
+
+    def on_update(self, packet, flow):
+        # On every update with the flow
+        if packet.ip_size:
+            if packet.ip_size <= 128:
+                flow.udps.NUM_PKTS_UP_TO_128_BYTES += 1
+            elif packet.ip_size > 128 and packet.ip_size <= 256:
+                flow.udps.NUM_PKTS_128_TO_256_BYTES += 1
+            elif packet.ip_size > 256 and packet.ip_size <= 512:
+                flow.udps.NUM_PKTS_256_TO_512_BYTES += 1
+            elif packet.ip_size > 512 and packet.ip_size <= 1024:
+                flow.udps.NUM_PKTS_512_TO_1024_BYTES += 1
+            elif packet.ip_size > 1024 and packet.ip_size <= 1514:
+                flow.udps. NUM_PKTS_1024_TO_1514_BYTES += 1
+
+    def on_expire(self, flow):
+        pass
+
+
+def calc_bps(flow):
+    # avoid division by zero
+    src_duration_s = max(flow.src2dst_duration_ms, 1) / 1000
+    dst_duration_s = max(flow.dst2src_duration_ms, 1) / 1000
+
+    src_to_dst_bps = (flow.src2dst_bytes * 8) / src_duration_s
+    dst_to_src_bps = (flow.dst2src_bytes * 8) / dst_duration_s
+
+    src_to_dst_bps = round(src_to_dst_bps, 1)
+    dst_to_src_bps = round(dst_to_src_bps, 1)
+
+    # since only one value exists, avg == current
+    avg_src_to_dst_bps = src_to_dst_bps
+    avg_dst_to_src_bps = dst_to_src_bps
+
+    return src_to_dst_bps, dst_to_src_bps, avg_src_to_dst_bps, avg_dst_to_src_bps
 
 
 def get_flow_flag_stats(flow):
@@ -54,9 +100,20 @@ def get_flow_flag_stats(flow):
         }
 
 
+def get_icmp_info(flow):
+    icmp_ipv4_type = 0
+    if flow.protocol == 1:
+        icmp_ipv4_type = flow.application_name
+
+    return icmp_ipv4_type
+
+
 def nfs_processor(streamer):
     for flow in streamer:
         tcp_records = get_flow_flag_stats(flow)
+        src_to_dst_bps, dst_to_src_bps, avg_src_to_dst_bps, avg_dst_to_src_bps = calc_bps(
+            flow)
+
         flow_record = {
             "FLOW_ID": flow.id,
             "IPV4_SRC_ADDR": flow.src_ip,
@@ -79,31 +136,49 @@ def nfs_processor(streamer):
             "SHORTEST_FLOW_PKT": flow.bidirectional_min_ps,
             "MIN_IP_PKT_LEN": flow.udps.min_ip_pkt_size,
             "MAX_IP_PKT_LEN": flow.udps.max_ip_pkt_size,
+            "SRC_TO_DST_SECOND_BYTES": src_to_dst_bps,
+            "DST_TO_SRC_SECOND_BYTES": dst_to_src_bps,
+            "SRC_TO_DST_AVG_THROUGHPUT": avg_src_to_dst_bps,
+            "DST_TO_SRC_AVG_THROUGHPUT": avg_dst_to_src_bps,
+            "NUM_PKTS_UP_TO_128_BYTES": flow.udps.NUM_PKTS_UP_TO_128_BYTES,
+            "NUM_PKTS_128_TO_256_BYTES": flow.udps.NUM_PKTS_128_TO_256_BYTES,
+            "NUM_PKTS_256_TO_512_BYTES": flow.udps.NUM_PKTS_256_TO_512_BYTES,
+            "NUM_PKTS_512_TO_1024_BYTES": flow.udps.NUM_PKTS_512_TO_1024_BYTES,
+            "NUM_PKTS_1024_TO_1514_BYTES": flow.udps.NUM_PKTS_1024_TO_1514_BYTES,
         }
 
         print(f"""
-        FLOW_ID                    {flow_record['FLOW_ID']}
-        IPV4_SRC_ADDR              {flow_record['IPV4_SRC_ADDR']}
-        L4_SRC_PORT                {flow_record['L4_SRC_PORT']}
-        IPV4_DST_ADDR              {flow_record['IPV4_DST_ADDR']}
-        L4_DST_PORT                {flow_record['L4_DST_PORT']}
-        PROTOCOL                   {flow_record['PROTOCOL']}
-        L7_PROTO                   {flow_record['L7_PROTO']}
-        IN_BYTES                   {flow_record['IN_BYTES']}
-        IN_PKTS                    {flow_record['IN_PKTS']}
-        OUT_BYTES                  {flow_record['OUT_BYTES']}
-        OUT_PKTS                   {flow_record['OUT_PKTS']}
-        FLOW_DURATION_MILLISECONDS {flow_record['FLOW_DURATION_MILLISECONDS']}
-        TCP_FLAGS                  {flow_record['TCP_FLAGS']}
-        CLIENT_FLAGS               {flow_record['CLIENT_TCP_FLAGS']}
-        SERVER_FLAGS               {flow_record['SERVER_TCP_FLAGS']}
-        DURATION_IN                {flow_record['DURATION_IN']}
-        DURATION_OUT               {flow_record['DURATION_OUT']}
-        LONGEST_FLOW_PKT           {flow_record['LONGEST_FLOW_PKT']}
-        SHORTEST_FLOW_PKT          {flow_record['SHORTEST_FLOW_PKT']}
-        MIN_IP_PKT_LEN             {flow_record['MAX_IP_PKT_LEN']}
-        MAX_IP_PKT_LEN             {flow_record['MIN_IP_PKT_LEN']}
-        """)
+                FLOW_ID                    {flow_record['FLOW_ID']}
+                IPV4_SRC_ADDR              {flow_record['IPV4_SRC_ADDR']}
+                L4_SRC_PORT                {flow_record['L4_SRC_PORT']}
+                IPV4_DST_ADDR              {flow_record['IPV4_DST_ADDR']}
+                L4_DST_PORT                {flow_record['L4_DST_PORT']}
+                PROTOCOL                   {flow_record['PROTOCOL']}
+                L7_PROTO                   {flow_record['L7_PROTO']}
+                IN_BYTES                   {flow_record['IN_BYTES']}
+                IN_PKTS                    {flow_record['IN_PKTS']}
+                OUT_BYTES                  {flow_record['OUT_BYTES']}
+                OUT_PKTS                   {flow_record['OUT_PKTS']}
+                FLOW_DURATION_MILLISECONDS {flow_record['FLOW_DURATION_MILLISECONDS']}
+                TCP_FLAGS                  {flow_record['TCP_FLAGS']}
+                CLIENT_FLAGS               {flow_record['CLIENT_TCP_FLAGS']}
+                SERVER_FLAGS               {flow_record['SERVER_TCP_FLAGS']}
+                DURATION_IN                {flow_record['DURATION_IN']}
+                DURATION_OUT               {flow_record['DURATION_OUT']}
+                LONGEST_FLOW_PKT           {flow_record['LONGEST_FLOW_PKT']}
+                SHORTEST_FLOW_PKT          {flow_record['SHORTEST_FLOW_PKT']}
+                MIN_IP_PKT_LEN             {flow_record['MAX_IP_PKT_LEN']}
+                MAX_IP_PKT_LEN             {flow_record['MIN_IP_PKT_LEN']}
+                SRC_TO_DST_SECOND_BYTES    {flow_record['SRC_TO_DST_SECOND_BYTES']}
+                DST_SRC_TO_SECOND_BYTES    {flow_record['DST_TO_SRC_SECOND_BYTES']}
+                SRC_TO_DST_AVG_THROUGHPUT  {flow_record['SRC_TO_DST_AVG_THROUGHPUT']}
+                DST_TO_SRC_AVG_THROUGHPUT  {flow_record['DST_TO_SRC_AVG_THROUGHPUT']}
+                NUM_PKTS_UP_TO_128_BYTES   {flow_record['NUM_PKTS_UP_TO_128_BYTES']}
+                NUM_PKTS_128_TO_256_BYTES  {flow_record['NUM_PKTS_128_TO_256_BYTES']}
+                NUM_PKTS_256_TO_512_BYTES  {flow_record['NUM_PKTS_256_TO_512_BYTES']}
+                NUM_PKTS_512_TO_1024_BYTES {flow_record['NUM_PKTS_512_TO_1024_BYTES']}
+                NUM_PKTS_1024_TO_1514_BYTES{flow_record['NUM_PKTS_1024_TO_1514_BYTES']}
+                """)
 
 
 streamer = NFStreamer(
@@ -111,7 +186,8 @@ streamer = NFStreamer(
     decode_tunnels=True,
     statistical_analysis=True,
     accounting_mode=True,
-    udps=MyCustomFeature()
+    n_dissections=20,
+    udps=[ip_pkt_len_return(), get_size_pkts()]
 )
 while True:
     try:
