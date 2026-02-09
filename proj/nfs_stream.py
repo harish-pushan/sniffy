@@ -1,9 +1,28 @@
 from nfstream import NFStreamer, NFPlugin
 
 
+class get_ttl_value(NFPlugin):
+    def on_init(self, packet, flow):
+        # TTL is on the 8th byte offset
+        ttl = packet.ip_packet[8]
+        flow.udps.min_ttl = ttl
+        flow.udps.max_ttl = ttl
+
+    def on_update(self, packet, flow):
+        if len(packet.ip_packet) > 8:
+            ttl = packet.ip_packet[8]
+            if ttl > flow.udps.max_ttl:
+                flow.udps.max_ttl = ttl
+            elif ttl < flow.udps.min_ttl:
+                flow.udps.min_ttl = ttl
+
+    def on_expire(self, flow):
+        pass
+
+
 class ip_pkt_len_return(NFPlugin):
     def on_init(self, packet, flow):
-        """Called when a flow is first created."""
+        # Called when a flow is first created
         # Initialize a custom variable on the flow object
         flow.udps.ip_pkt_len = []
         flow.udps.min_ip_pkt_size = 0
@@ -21,7 +40,7 @@ class ip_pkt_len_return(NFPlugin):
 
 class get_size_pkts(NFPlugin):
     def on_init(self, packet, flow):
-        """Called when a flow is first created."""
+        # Called when a flow is first created
         # Initialize a custom variable on the flow object
         flow.udps.NUM_PKTS_UP_TO_128_BYTES = 0
         flow.udps.NUM_PKTS_128_TO_256_BYTES = 0
@@ -41,7 +60,7 @@ class get_size_pkts(NFPlugin):
             elif packet.ip_size > 512 and packet.ip_size <= 1024:
                 flow.udps.NUM_PKTS_512_TO_1024_BYTES += 1
             elif packet.ip_size > 1024 and packet.ip_size <= 1514:
-                flow.udps. NUM_PKTS_1024_TO_1514_BYTES += 1
+                flow.udps.NUM_PKTS_1024_TO_1514_BYTES += 1
 
     def on_expire(self, flow):
         pass
@@ -132,6 +151,8 @@ def nfs_processor(streamer):
             "SERVER_TCP_FLAGS": tcp_records['server_total'],
             "DURATION_IN": flow.dst2src_duration_ms,
             "DURATION_OUT": flow.src2dst_duration_ms,
+            "MIN_TTL": flow.udps.min_ttl,
+            "MAX_TTL": flow.udps.max_ttl,
             "LONGEST_FLOW_PKT": flow.bidirectional_max_ps,
             "SHORTEST_FLOW_PKT": flow.bidirectional_min_ps,
             "MIN_IP_PKT_LEN": flow.udps.min_ip_pkt_size,
@@ -165,6 +186,8 @@ def nfs_processor(streamer):
                 SERVER_FLAGS               {flow_record['SERVER_TCP_FLAGS']}
                 DURATION_IN                {flow_record['DURATION_IN']}
                 DURATION_OUT               {flow_record['DURATION_OUT']}
+                MIN_TTL                    {flow_record['MIN_TTL']}
+                MAX_TTL                    {flow_record['MAX_TTL']}
                 LONGEST_FLOW_PKT           {flow_record['LONGEST_FLOW_PKT']}
                 SHORTEST_FLOW_PKT          {flow_record['SHORTEST_FLOW_PKT']}
                 MIN_IP_PKT_LEN             {flow_record['MAX_IP_PKT_LEN']}
@@ -187,7 +210,7 @@ streamer = NFStreamer(
     statistical_analysis=True,
     accounting_mode=True,
     n_dissections=20,
-    udps=[ip_pkt_len_return(), get_size_pkts()]
+    udps=[ip_pkt_len_return(), get_size_pkts(), get_ttl_value()]
 )
 while True:
     try:
