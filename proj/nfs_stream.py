@@ -1,6 +1,23 @@
 from nfstream import NFStreamer, NFPlugin
 
 
+class get_icmp_vales(NFPlugin):
+    def on_init(self, packet, flow):
+        flow.udps.icmp_type = packet.ip_packet[0]
+        flow.udps.icmp_code = packet.ip_packet[1]
+        flow.udps.icmp_ipv4_type = 0
+        flow.udps.icmp_type = 0
+
+    def on_update(self, packet, flow):
+        if len(packet.ip_packet) > 0:
+            flow.udps.icmp_ipv4_type = flow.udps.icmp_type
+            flow.udps.icmp_type = (
+                (flow.udps.icmp_type * 258) + flow.udps.icmp_type)
+
+    def on_expire(self, flow):
+        pass
+
+
 class get_ttl_value(NFPlugin):
     def on_init(self, packet, flow):
         # TTL is on the 8th byte offset
@@ -166,6 +183,7 @@ def nfs_processor(streamer):
             "NUM_PKTS_256_TO_512_BYTES": flow.udps.NUM_PKTS_256_TO_512_BYTES,
             "NUM_PKTS_512_TO_1024_BYTES": flow.udps.NUM_PKTS_512_TO_1024_BYTES,
             "NUM_PKTS_1024_TO_1514_BYTES": flow.udps.NUM_PKTS_1024_TO_1514_BYTES,
+            "ICMP_TYPE": flow.udps.icmp_type
         }
 
         print(f"""
