@@ -1,18 +1,43 @@
 from nfstream import NFStreamer, NFPlugin
+import dpkt
+
+
+class get_dns_value(NFPlugin):
+    def on_init(self, packet, flow):
+        flow.udps.dns_id = None
+
+    def on_update(self, packet, flow):
+        # only UDP
+        if packet.protocol != 17:
+            return
+        try:
+            # parse full IP packet
+            ip = dpkt.ip.IP(packet.ip_packet)
+            # make sure it's UDP
+            if not isinstance(ip.data, dpkt.udp.UDP):
+                return
+            udp = ip.data
+            # DNS header min size = 12 bytes
+            if len(udp.data) <= 12:
+                return
+
+            dns = dpkt.dns.DNS(udp.data)
+            flow.udps.dns_id = dns.id
+
+        except (dpkt.UnpackError, IndexError):
+            pass
 
 
 class get_icmp_vales(NFPlugin):
     def on_init(self, packet, flow):
-        flow.udps.icmp_type = packet.ip_packet[0]
-        flow.udps.icmp_code = packet.ip_packet[1]
-        flow.udps.icmp_ipv4_type = 0
         flow.udps.icmp_type = 0
+        flow.udps.icmp_ipv4_type = packet.ip_packet[0]
+        flow.udps.icmp_code = packet.ip_packet[1]
 
     def on_update(self, packet, flow):
         if len(packet.ip_packet) > 0:
-            flow.udps.icmp_ipv4_type = flow.udps.icmp_type
             flow.udps.icmp_type = (
-                (flow.udps.icmp_type * 258) + flow.udps.icmp_type)
+                (flow.udps.icmp_ipv4_type * 258) + flow.udps.icmp_code)
 
     def on_expire(self, flow):
         pass
@@ -183,7 +208,10 @@ def nfs_processor(streamer):
             "NUM_PKTS_256_TO_512_BYTES": flow.udps.NUM_PKTS_256_TO_512_BYTES,
             "NUM_PKTS_512_TO_1024_BYTES": flow.udps.NUM_PKTS_512_TO_1024_BYTES,
             "NUM_PKTS_1024_TO_1514_BYTES": flow.udps.NUM_PKTS_1024_TO_1514_BYTES,
-            "ICMP_TYPE": flow.udps.icmp_type
+            "ICMP_TYPE": flow.udps.icmp_type,
+            "ICMP_IPV4_TYPE": flow.udps.icmp_ipv4_type,
+            "DNS_QUERY_ID": flow.udps.dns_id,
+
         }
 
         print(f"""
@@ -219,6 +247,9 @@ def nfs_processor(streamer):
                 NUM_PKTS_256_TO_512_BYTES  {flow_record['NUM_PKTS_256_TO_512_BYTES']}
                 NUM_PKTS_512_TO_1024_BYTES {flow_record['NUM_PKTS_512_TO_1024_BYTES']}
                 NUM_PKTS_1024_TO_1514_BYTES{flow_record['NUM_PKTS_1024_TO_1514_BYTES']}
+                ICMP_TYPE                  {flow_record['ICMP_IPV4_TYPE']}
+                ICMP_IPV4_TYPE             {flow_record['ICMP_TYPE']}
+                DNS_QUERY_ID               {flow_record['DNS_QUERY_ID']}
                 """)
 
 
@@ -228,7 +259,8 @@ streamer = NFStreamer(
     statistical_analysis=True,
     accounting_mode=True,
     n_dissections=20,
-    udps=[ip_pkt_len_return(), get_size_pkts(), get_ttl_value()]
+    udps=[ip_pkt_len_return(), get_size_pkts(), get_ttl_value(),
+          get_icmp_vales(), get_dns_value()]
 )
 while True:
     try:
