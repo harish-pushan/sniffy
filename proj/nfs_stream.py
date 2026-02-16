@@ -2,9 +2,12 @@ from nfstream import NFStreamer, NFPlugin
 import dpkt
 
 
+
 class get_dns_value(NFPlugin):
     def on_init(self, packet, flow):
-        flow.udps.dns_id = None
+        flow.udps.dns_id = 0
+        flow.udps.dns_qt = 0 
+        flow.udps.dns_ttl = 0
 
     def on_update(self, packet, flow):
         # only UDP
@@ -22,11 +25,21 @@ class get_dns_value(NFPlugin):
                 return
 
             dns = dpkt.dns.DNS(udp.data)
+            dns_ans = dns.an
+            for i in dns_ans:
+                # this is a list of multiple attr so we need to use a for loop to use the type attr same for the ttl
+                flow.udps.dns_qt= i.type
+                if flow.udps.dns_qt == 1:
+                    flow.udps.dns_ttl = i.ttl
+                break
+
+            # Dns query id like the numbers for the id
             flow.udps.dns_id = dns.id
 
         except (dpkt.UnpackError, IndexError):
             pass
-
+        except(UnicodeDecodeError):
+            pass
 
 class get_icmp_vales(NFPlugin):
     def on_init(self, packet, flow):
@@ -211,6 +224,8 @@ def nfs_processor(streamer):
             "ICMP_TYPE": flow.udps.icmp_type,
             "ICMP_IPV4_TYPE": flow.udps.icmp_ipv4_type,
             "DNS_QUERY_ID": flow.udps.dns_id,
+            "DNS_QUERY_TYPE": flow.udps.dns_qt,
+            "DNS_TTL_ANSWER": flow.udps.dns_ttl,
 
         }
 
@@ -250,6 +265,8 @@ def nfs_processor(streamer):
                 ICMP_TYPE                  {flow_record['ICMP_IPV4_TYPE']}
                 ICMP_IPV4_TYPE             {flow_record['ICMP_TYPE']}
                 DNS_QUERY_ID               {flow_record['DNS_QUERY_ID']}
+                DNS_QUERY_TYPE             {flow_record['DNS_QUERY_TYPE']}
+                DNS_TTL_ANSWER             {flow_record['DNS_TTL_ANSWER']}
                 """)
 
 

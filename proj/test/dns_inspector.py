@@ -2,9 +2,11 @@ from nfstream import NFStreamer, NFPlugin
 import dpkt
 
 
-class DNSIdPlugin(NFPlugin):
+class get_dns_value(NFPlugin):
     def on_init(self, packet, flow):
         flow.udps.dns_id = None
+        flow.udps.dns_qt = None
+        flow.udps.dns_ttl = 0
 
     def on_update(self, packet, flow):
         # only UDP
@@ -22,17 +24,32 @@ class DNSIdPlugin(NFPlugin):
                 return
 
             dns = dpkt.dns.DNS(udp.data)
+            dns_ans = dns.an
+            for i in dns_ans:
+                # this is a list of multiple attr so we need to use a for loop to use the type attr same for the ttl
+                flow.udps.dns_qt= i.type
+                if flow.udps.dns_qt == 1:
+                    flow.udps.dns_ttl = i.ttl
+                break
+
+            # Dns query id like the numbers for the id
             flow.udps.dns_id = dns.id
 
         except (dpkt.UnpackError, IndexError):
+            pass
+        except(UnicodeDecodeError):
             pass
 
 
 streamer = NFStreamer(
     source="capture.pcap",
-    udps=[DNSIdPlugin()]
+    udps=[get_dns_value()]
+
 )
 
 for flow in streamer:
+
     if flow.udps.dns_id is not None:
         print(flow.src_ip, "->", flow.dst_ip, "DNS ID:", flow.udps.dns_id)
+        print(flow.src_ip, "->", flow.dst_ip, "DNS QUERY:", flow.udps.dns_qt)
+        print(flow.src_ip, "->", flow.dst_ip, "DNS TTL:", flow.udps.dns_ttl)
