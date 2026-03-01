@@ -6,14 +6,9 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 import joblib
 import warnings
 
-# ======================
-# Ignore overflow warnings
-# ======================
 warnings.simplefilter(action='ignore', category=RuntimeWarning)
 
-# ======================
-# Helper function: prepare features and labels
-# ======================
+
 def prepare_features(csv_path):
     df = pd.read_csv(csv_path)
     drop_cols = ["IPV4_SRC_ADDR", "IPV4_DST_ADDR", "Dataset", "Attack"]
@@ -36,10 +31,6 @@ def prepare_features(csv_path):
     scale_pos_weight = neg / pos
 
     return X_train, X_test, y_train, y_test, scale_pos_weight
-
-# ======================
-# List of CSV chunks
-# ======================
 datasets = [
     "/mnt/8tb_hdd/harish/ds2/splited/dataset0.csv",
     "/mnt/8tb_hdd/harish/ds2/splited/dataset1.csv",
@@ -47,14 +38,8 @@ datasets = [
     # ... add all other datasets
 ]
 
-# ======================
-# Initialize model variable
-# ======================
 model = None
 
-# ======================
-# Loop through CSVs for incremental training
-# ======================
 for idx, csv_path in enumerate(datasets):
 
     print(f"\n===== Training on dataset {idx} =====")
@@ -87,9 +72,6 @@ for idx, csv_path in enumerate(datasets):
             verbose=50
         )
 
-    # ======================
-    # Evaluation
-    # ======================
     y_pred = model.predict(X_test)
     y_proba = model.predict_proba(X_test)[:, 1]
 
@@ -109,9 +91,6 @@ for idx, csv_path in enumerate(datasets):
     print("Confusion Matrix:")
     print(cm)
 
-# ======================
-# Export final model
-# ======================
 joblib.dump(model, "xgb_attack_model.pkl")
 print("\nFinal model exported successfully!")
 

@@ -1,5 +1,7 @@
 from nfstream import NFStreamer, NFPlugin
+import pyshark
 import dpkt
+from multiprocessing import Process
 
 
 class get_dns_value(NFPlugin):
@@ -27,7 +29,7 @@ class get_dns_value(NFPlugin):
             dns_ans = dns.an
             for i in dns_ans:
                 # this is a list of multiple attr so we need to use a for loop to use the type attr same for the ttl
-                flow.udps.dns_qt= i.type
+                flow.udps.dns_qt = i.type
                 if flow.udps.dns_qt == 1:
                     flow.udps.dns_ttl = i.ttl
                 break
@@ -37,7 +39,7 @@ class get_dns_value(NFPlugin):
 
         except (dpkt.UnpackError, IndexError):
             pass
-        except(UnicodeDecodeError):
+        except (UnicodeDecodeError):
             pass
 
 
@@ -47,9 +49,25 @@ streamer = NFStreamer(
 
 )
 
-for flow in streamer:
+pyshark_cap = pyshark.FileCapture(
+    "capture.pcap", display_filter='tcp.analysis.retransmission')
 
-    if flow.udps.dns_id is not None:
-        print(flow.src_ip, "->", flow.dst_ip, "DNS ID:", flow.udps.dns_id)
-        print(flow.src_ip, "->", flow.dst_ip, "DNS QUERY:", flow.udps.dns_qt)
-        print(flow.src_ip, "->", flow.dst_ip, "DNS TTL:", flow.udps.dns_ttl)
+
+def nfstram_shit():
+    for flow in streamer:
+        if flow.udps.dns_id is not None:
+            print(flow.src_ip, "->", flow.dst_ip, "DNS ID:", flow.udps.dns_id)
+            print(flow.src_ip, "->", flow.dst_ip,
+                  "DNS QUERY:", flow.udps.dns_qt)
+            print(flow.src_ip, "->", flow.dst_ip,
+                  "DNS TTL:", flow.udps.dns_ttl)
+
+
+def pyshark_shit():
+    for shit in pyshark_cap:
+        print(shit)
+
+
+if __name__ == '__main__':
+    Process(target=nfstram_shit).start()
+    Process(target=pyshark_shit).start()
