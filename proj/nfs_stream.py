@@ -2,11 +2,8 @@ from nfstream import NFStreamer, NFPlugin
 import dpkt
 
 
-from classes.calc_bps import calc_bps
 from classes.dns_values import get_dns_value
-from classes.flags_stats import get_flow_flag_stats
 from classes.get_diff_pkt_sizes import get_size_pkts
-from classes.icmp_info import get_icmp_info
 from classes.icmp_values import get_icmp_vales
 from classes.ip_pkt_len import ip_pkt_len_return
 from classes.nfstram_processor import nfs_processor
@@ -19,8 +16,8 @@ streamer = NFStreamer(
     statistical_analysis=True,
     accounting_mode=True,
     n_dissections=20,
-    udps=[ip_pkt_len_return(), get_size_pkts(), get_ttl_value(),
-          get_icmp_vales(), get_dns_value(), get_tcp_window()]
+    udps=[get_dns_value(), get_size_pkts(), ip_pkt_len_return(),
+          get_icmp_vales(), get_ttl_value(), get_tcp_window()]
 )
 while True:
     try:

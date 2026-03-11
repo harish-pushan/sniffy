@@ -1,4 +1,9 @@
 
+from classes.icmp_info import get_icmp_info
+from classes.flags_stats import get_flow_flag_stats
+from classes.calc_bps import calc_bps
+
+
 def nfs_processor(streamer):
     for flow in streamer:
         tcp_records = get_flow_flag_stats(flow)
@@ -89,5 +94,3 @@ def nfs_processor(streamer):
                 DNS_QUERY_TYPE             {flow_record['DNS_QUERY_TYPE']}
                 DNS_TTL_ANSWER             {flow_record['DNS_TTL_ANSWER']}
                 """)
-
-
