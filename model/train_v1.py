@@ -1,12 +1,12 @@
 import numpy as np
 import pandas as pd
 import warnings
-
+import os 
 
 warnings.simplefilter(action='ignore', category=RuntimeWarning)
 # Define the number of rows per chunk
-chunksize = 100000
-cols = [
+CHUNKSIZE = 100000
+COLS = [
     "IPV4_SRC_ADDR",
     "L4_SRC_PORT",
     "IPV4_DST_ADDR",
@@ -57,16 +57,26 @@ cols = [
 
 
 def split_csv(csv_location):
-    storage_location = "/home/h4r15h/dataset/sniffy/"
+    storage_location = "/home/h4r15h/dataset/sniffy/splitted/"
     counter = 0
-    chunks = pd.read_csv(csv_location, chunksize=chunksize)
+    chunks = pd.read_csv(csv_location, chunksize=CHUNKSIZE)
     for chunk in chunks:
         if counter == 0:
             df = pd.DataFrame(chunk)
-            df.to_csv(location)
+            df.to_csv(f'{storage_location}dataset{counter}.csv')
+            print(f"Write succussful for :{storage_location}dataset{counter}.csv")
+            counter +=1
+        else:
+            df = pd.DataFrame(chunk)
+            df.columns = COLS
+            df.to_csv(f'{storage_location}dataset{counter}.csv')
+            print(f"Write succussful for :{storage_location}dataset{counter}.csv")
+            counter +=1
+
 
 
 def import_data(csv_location):
     raw_dataset = pd.read_csv(csv_location)
     np_array = raw_dataset.to_numpy()
     return np_array
+
