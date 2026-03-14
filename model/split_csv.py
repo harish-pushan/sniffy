@@ -1,7 +1,7 @@
 import pandas as pd
 
 # Define the number of rows per chunk
-chunksize = 5000000 
+chunksize = 5000000
 cols = [
     "IPV4_SRC_ADDR",
     "L4_SRC_PORT",
@@ -54,7 +54,8 @@ cols = [
 
 # Create an iterator by passing the chunksize argument
 # This does not load the entire file into memory immediately
-chunks = pd.read_csv('/mnt/8tb_hdd/harish/ds2/dataset.csv', chunksize=chunksize)
+chunks = pd.read_csv(
+    '/mnt/8tb_hdd/harish/ds2/dataset.csv', chunksize=chunksize)
 storage_spot = '/mnt/8tb_hdd/harish/ds2/splited/'
 # Example: calculate the total sum of a 'sales' column across the entire file
 dataset_number = 0
@@ -63,18 +64,18 @@ for chunk in chunks:
     # Process each chunk; for example, sum a column
     if dataset_number == 0:
         df = pd.DataFrame(chunk)
-        df.to_csv(f'{storage_spot}dataset{dataset_number}.csv',index=False)
-        print(f'write successfull for: {storage_spot}dataset{dataset_number}.csv')
+        df.to_csv(f'{storage_spot}dataset{dataset_number}.csv', index=False)
+        print(f'write successfull for: {
+              storage_spot}dataset{dataset_number}.csv')
         dataset_number += 1
     else:
-        
+
         # Read the file without assuming a header, then assign the new names
         df = pd.DataFrame(chunk)
-        df.columns = cols 
-        
+        df.columns = cols
+
         # Save the DataFrame to a new CSV file
         df.to_csv(f"{storage_spot}dataset{dataset_number}.csv", index=False)
-        print(f'write successfull for: {storage_spot}dataset{dataset_number}.csv')
-        dataset_number +=1 
-        
-
+        print(f'write successfull for: {
+              storage_spot}dataset{dataset_number}.csv')
+        dataset_number += 1
