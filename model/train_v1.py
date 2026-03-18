@@ -3,6 +3,7 @@ import pandas as pd
 import warnings
 import os 
 
+
 warnings.simplefilter(action='ignore', category=RuntimeWarning)
 # Define the number of rows per chunk
 CHUNKSIZE = 100000
@@ -60,12 +61,14 @@ def split_csv(csv_location):
     storage_location = "/home/h4r15h/dataset/sniffy/splitted/"
     counter = 0
     chunks = pd.read_csv(csv_location, chunksize=CHUNKSIZE)
+    # Using the default header as the column 
     for chunk in chunks:
         if counter == 0:
             df = pd.DataFrame(chunk)
             df.to_csv(f'{storage_location}dataset{counter}.csv')
             print(f"Write succussful for :{storage_location}dataset{counter}.csv")
             counter +=1
+    # Hardcoding the header and using that as the column (I can't come up with a better solution)
         else:
             df = pd.DataFrame(chunk)
             df.columns = COLS
@@ -80,3 +83,17 @@ def import_data(csv_location):
     np_array = raw_dataset.to_numpy()
     return np_array
 
+def prepare_features_from_directory(directory_location):
+    #directory path treversal
+    file_name = []
+    for (dirpath,dirname,filename) in os.walk(directory_location):
+        file_name.extend(filename)
+        if file_name[-3:] == ".csv":
+            #now think about how to get this data into the training routine 
+            pass
+        
+
+    
+
+
+    
