@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import warnings
 import os 
-
+from sys import argv
 
 warnings.simplefilter(action='ignore', category=RuntimeWarning)
 # Define the number of rows per chunk
@@ -83,17 +83,18 @@ def import_data(csv_location):
     np_array = raw_dataset.to_numpy()
     return np_array
 
-def prepare_features_from_directory(directory_location):
+def prepare_features_from_directory(directory_location:str):
     #directory path treversal
-    file_name = []
     for (dirpath,dirname,filename) in os.walk(directory_location):
-        file_name.extend(filename)
-        if file_name[-3:] == ".csv":
-            #now think about how to get this data into the training routine 
-            pass
+        if filename[-3:] == ".csv":
+                #now think about how to get this data into the training routine 
+                # Create the numpy array with the file name 
+                data_chunk = pd.read_csv(filename)    
+                df = pd.DataFrame(data_chunk)
+                print(df)
         
 
-    
-
+print(argv[1])    
+prepare_features_from_directory(str(argv[1]))
 
     
