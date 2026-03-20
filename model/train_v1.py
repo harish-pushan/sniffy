@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import warnings
-import os 
+from os import walk
 from sys import argv
 
 warnings.simplefilter(action='ignore', category=RuntimeWarning)
@@ -85,16 +85,25 @@ def import_data(csv_location):
 
 def prepare_features_from_directory(directory_location:str):
     #directory path treversal
-    for (dirpath,dirname,filename) in os.walk(directory_location):
-        if filename[-3:] == ".csv":
+    file_names_list = []
+    for (dirpath,dirname,filename) in walk(directory_location):
+        print(dirpath)
+        file_names_list.extend(filename)
+    
+    for i in file_names_list:
+        print(i)
+        if i[-3:] == "csv":
                 #now think about how to get this data into the training routine 
                 # Create the numpy array with the file name 
-                data_chunk = pd.read_csv(filename)    
+                new_location = f"/home/h4r15h/dataset/sniffy/splitted/{i}"
+                data_chunk = pd.read_csv(new_location)    
                 df = pd.DataFrame(data_chunk)
                 print(df)
+        else:
+            pass
         
 
-print(argv[1])    
-prepare_features_from_directory(str(argv[1]))
+
+prepare_features_from_directory("/home/h4r15h/dataset/sniffy/splitted")
 
     
