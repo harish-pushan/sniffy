@@ -3,6 +3,7 @@ import pandas as pd
 import warnings
 from os import walk
 from sys import argv
+from sklearn.model_selection import train_test_split
 
 warnings.simplefilter(action='ignore', category=RuntimeWarning)
 # Define the number of rows per chunk
@@ -83,7 +84,30 @@ def import_data(csv_location):
     np_array = raw_dataset.to_numpy()
     return np_array
 
-def prepare_features_from_directory(directory_location:str):
+def prepare_features(dataframe):
+    df = dataframe
+    drop_cols = ["IPV4_SRC_ADDR", "IPV4_DST_ADDR", "Dataset", "Attack"]
+    X = df.drop(columns=drop_cols + ["Label"])
+    y = df["Label"]
+
+    # Clean data
+    X.replace([np.inf, -np.inf], np.nan, inplace=True)
+    X.fillna(0, inplace=True)
+    X = X.astype(np.float32)
+    X = X.clip(upper=1e8)
+
+    # Train-test split
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.35, random_state=42, stratify=y
+    )
+
+    # Class imbalance
+    neg, pos = np.bincount(y_train)
+    scale_pos_weight = neg / pos
+
+    return X_train, X_test, y_train, y_test, scale_pos_weight
+
+def prepare_dataframe_from_directory(directory_location:str):
     #directory path treversal
     file_names_list = []
     for (dirpath,dirname,filename) in walk(directory_location):
@@ -98,12 +122,12 @@ def prepare_features_from_directory(directory_location:str):
                 new_location = f"/home/h4r15h/dataset/sniffy/splitted/{i}"
                 data_chunk = pd.read_csv(new_location)    
                 df = pd.DataFrame(data_chunk)
-                print(df)
+                xtrain , xtest, ytrain, ytest ,scal_pos_weight = prepare_features(df)
         else:
             pass
         
 
 
-prepare_features_from_directory("/home/h4r15h/dataset/sniffy/splitted")
+prepare_dataframe_from_directory("/home/h4r15h/dataset/sniffy/splitted")
 
     
