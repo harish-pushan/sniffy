@@ -5,6 +5,9 @@ from os import walk
 from sys import argv
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
+import joblib
+import xgboost as xgb
+import gc 
 
 
 warnings.simplefilter(action='ignore', category=RuntimeWarning)
@@ -87,6 +90,29 @@ def import_data(csv_location:str):
     np_array = raw_dataset.to_numpy()
     return np_array
 
+def calc_scale_pos_weight(directory_location):
+    # For the class imbalance we are couting the scale_pos_weight globally so not change the weights derastically 
+    #directory path treversal
+    file_names_list = []
+    total_pos, total_neg = 0,0
+
+    #Gets the list of the files in the dict 
+    for (dirpath,dirname,filename) in walk(directory_location):
+        file_names_list.extend(filename)
+    
+    for i in file_names_list:
+        if i[-3:] == "csv":
+            #Reading the files into the dataframe 
+            dataframe = pd.read_csv(f'{directory_location}{i}',usecols=['Label'])
+            unique, counts = np.unique(dataframe,return_counts=True)
+            counts = counts.astype(int)
+            total_neg += counts[0]
+            total_pos += counts[1]
+    total_pos_weight = total_neg/total_pos        
+    return total_pos_weight
+
+        
+    
 def prepare_features(dataframe):
     df = dataframe
     drop_cols = ["IPV4_SRC_ADDR", "IPV4_DST_ADDR", "Dataset", "Attack"]
@@ -104,95 +130,92 @@ def prepare_features(dataframe):
         X, y, test_size=0.35, random_state=42, stratify=y
     )
 
-    # Class imbalance
-    neg, pos = np.bincount(y_train)
-    scale_pos_weight = neg / pos
 
-    return X_train, X_test, y_train, y_test, scale_pos_weight
 
+
+
+    return X_train, X_test, y_train, y_test
 '''
 #All the documentation says that is should be:
 #scale_pos_weight = count(negative examples)/count(Positive examples)
 '''
 
-def prepare_dataframe_from_directory(directory_location:str):
+def train_the_first_stage_model(directory_location:str):
     #directory path treversal
     file_names_list = []
     for (dirpath,dirname,filename) in walk(directory_location):
         print(dirpath)
         file_names_list.extend(filename)
+    model = None
+    scale_pos_weight = None
     
     for i in file_names_list:
         print(i)
         if i[-3:] == "csv":
                 #now think about how to get this data into the training routine 
                 # Create the numpy array with the file name 
-                new_location = f"/home/h4r15h/dataset/sniffy/splitted/{i}"
+                new_location = f"{directory_location}{i}"
                 data_chunk = pd.read_csv(new_location)    
                 df = pd.DataFrame(data_chunk)
-                xtrain , xtest, ytrain, ytest ,scal_pos_weight = prepare_features(df)
-                return xtrain,xtest,ytrain,ytest,scal_pos_weight
-        else:
-            pass 
+                X_train , X_test, y_train, y_test  = prepare_features(df)
+                
+                if model is None:
+                # First dataset → create a new model
+                    model = xgb.XGBClassifier(
+                        objective="binary:logistic",
+                        n_estimators=20,
+                        max_depth=6,
+                        learning_rate=0.001,
+                        subsample=0.8,
+                        colsample_bytree=0.8,
+                        scale_pos_weight=scale_pos_weight,
+                        reg_alpha=0.1,
+                        reg_lambda=1,
+                        use_label_encoder=False,
+                        eval_metric="auc",
+                        random_state=42
+                    )
+                    # Train first model
+                    model.fit(X_train, y_train, eval_set=[(X_train, y_train), (X_test, y_test)], verbose=50)
+
+                else:
+                    # Subsequent datasets → continue training
+                    model.fit(
+                        X_train, y_train,
+                        eval_set=[(X_train, y_train), (X_test, y_test)],
+                        xgb_model=model,  # continue from previous model
+                        verbose=50
+                    )
+                    
+
+                y_pred = model.predict(X_test)
+                y_proba = model.predict_proba(X_test)[:, 1]
+    
+                acc = accuracy_score(y_test, y_pred)
+                prec = precision_score(y_test, y_pred)
+                rec = recall_score(y_test, y_pred)
+                f1 = f1_score(y_test, y_pred)
+                roc = roc_auc_score(y_test, y_proba)
+                cm = confusion_matrix(y_test, y_pred)
+    
+                print("===== Model Metrics =====")
+                print(f"Accuracy : {acc:.4f}")
+                print(f"Precision: {prec:.4f}")
+                print(f"Recall   : {rec:.4f}")
+                print(f"F1-score : {f1:.4f}")
+                print(f"ROC-AUC  : {roc:.4f}")
+                print("Confusion Matrix:")
+                print(cm)
+                
+                # Cleanup to save RAM
+                del df, X_train, y_train
+                gc.collect()
+        joblib.dump(model, "xgb_attack_model.pkl")
+        print("\nFinal model exported successfully!")       
+
             
-def train_model(xtrain,xtest,ytrain,ytest,scal_pos_weight):
-    model = None
-
-    for idx, csv_path in enumerate(datasets):
-    
-        print(f"\n===== Training on dataset {idx} =====")
-        X_train, X_test, y_train, y_test, scale_pos_weight = prepare_features(csv_path)
-    
-        if model is None:
-            # First dataset → create a new model
-            model = xgb.XGBClassifier(
-                objective="binary:logistic",
-                n_estimators=500,
-                max_depth=6,
-                learning_rate=0.05,
-                subsample=0.8,
-                colsample_bytree=0.8,
-                scale_pos_weight=scale_pos_weight,
-                reg_alpha=0.1,
-                reg_lambda=1,
-                use_label_encoder=False,
-                eval_metric="auc",
-                random_state=42
-            )
-            # Train first model
-            model.fit(X_train, y_train, eval_set=[(X_train, y_train), (X_test, y_test)], verbose=50)
-        else:
-            # Subsequent datasets → continue training
-            model.fit(
-                X_train, y_train,
-                eval_set=[(X_train, y_train), (X_test, y_test)],
-                xgb_model=model,  # continue from previous model
-                verbose=50
-            )
-    
-        y_pred = model.predict(X_test)
-        y_proba = model.predict_proba(X_test)[:, 1]
-    
-        acc = accuracy_score(y_test, y_pred)
-        prec = precision_score(y_test, y_pred)
-        rec = recall_score(y_test, y_pred)
-        f1 = f1_score(y_test, y_pred)
-        roc = roc_auc_score(y_test, y_proba)
-        cm = confusion_matrix(y_test, y_pred)
-    
-        print("===== Model Metrics =====")
-        print(f"Accuracy : {acc:.4f}")
-        print(f"Precision: {prec:.4f}")
-        print(f"Recall   : {rec:.4f}")
-        print(f"F1-score : {f1:.4f}")
-        print(f"ROC-AUC  : {roc:.4f}")
-        print("Confusion Matrix:")
-        print(cm)
-    
-    joblib.dump(model, "xgb_attack_model.pkl")
-    print("\nFinal model exported successfully!")       
-
 
 
 
     
+calc_scale_pos_weight("/home/h4r15h/dataset/sniffy/splitted/")
