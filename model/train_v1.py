@@ -147,7 +147,7 @@ def train_the_first_stage_model(directory_location:str):
         print(dirpath)
         file_names_list.extend(filename)
     model = None
-    scale_pos_weight = None
+    scale_pos_weight = calc_scale_pos_weight("/home/h4r15h/dataset/sniffy/splitted/")
     
     for i in file_names_list:
         print(i)
@@ -218,4 +218,3 @@ def train_the_first_stage_model(directory_location:str):
 
 
     
-calc_scale_pos_weight("/home/h4r15h/dataset/sniffy/splitted/")
