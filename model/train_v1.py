@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import warnings
-from os import walk
+from os import walk, path,makedirs
 from sys import argv
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
@@ -92,11 +92,11 @@ def import_data(csv_location:str):
 
 def calc_scale_pos_weight(directory_location):
     # For the class imbalance we are couting the scale_pos_weight globally so not change the weights derastically 
-    #directory path treversal
+    # Directory path treversal
     file_names_list = []
     total_pos, total_neg = 0,0
 
-    #Gets the list of the files in the dict 
+    # Gets the list of the files in the dict 
     for (dirpath,dirname,filename) in walk(directory_location):
         file_names_list.extend(filename)
     
@@ -129,11 +129,6 @@ def prepare_features(dataframe):
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.35, random_state=42, stratify=y
     )
-
-
-
-
-
     return X_train, X_test, y_train, y_test
 '''
 #All the documentation says that is should be:
@@ -215,6 +210,37 @@ def train_the_first_stage_model(directory_location:str):
 
             
 
+def prepare_sec_dataset(directory_location:str,created_location:str):
+    # Synth a second dataset with the original one with only the positive attack records 
+    file_counter = 0
+    if path.isdir(directory_location):
+        if path.isdir(created_location):
+            print("The source and destination path exist....")
+            #directory path treversal
+            file_names_list = []
+            for (dirpath,dirname,filename) in walk(directory_location):
+                print(dirpath)
+                file_names_list.extend(filename)
+            
+            #Prepare the files for second stage training 
+            for file in file_names_list:
+                print(file)
+                if file[-3:] == "csv":
+                    new_location = f"{directory_location}{file}"
+                    data_chunk = pd.read_csv(new_location)
+                    # Now we create a new dataframe based on if it a actual acttack or not 
+                    attack_chunk = data_chunk[data_chunk["Label"]==1]
+                    print(attack_chunk)
+                    
+
+            
+        else:
+            print("The destination directory dosen't exist.....creating the location....")
+            makedirs(created_location)
+            prepare_sec_dataset(directory_location,created_location)
+    else:
+        print("The source dataset location dosen't exist")
+        exit()
 
 
-    
+prepare_sec_dataset("/home/h4r15h/dataset/sniffy/splitted/","/home/h4r15h/dataset/sniffy/splitted_sec/")
