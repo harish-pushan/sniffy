@@ -17,4 +17,5 @@ threadpoolctl==3.6.0
 tqdm
 typing_extensions
 tzdata==2025.3
+xgboost
 

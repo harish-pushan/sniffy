@@ -115,21 +115,21 @@ def calc_scale_pos_weight(directory_location):
     
 def prepare_features(dataframe):
     df = dataframe
-    drop_cols = ["IPV4_SRC_ADDR", "IPV4_DST_ADDR", "Dataset", "Attack"]
-    X = df.drop(columns=drop_cols + ["Label"])
-    y = df["Label"]
+    drop_cols = ["ipv4_src_addr", "ipv4_dst_addr", "dataset", "attack"]
+    x = df.drop(columns=drop_cols + ["label"])
+    y = df["label"]
 
-    # Clean data
-    X.replace([np.inf, -np.inf], np.nan, inplace=True)
-    X.fillna(0, inplace=True)
-    X = X.astype(np.float32)
-    X = X.clip(upper=1e8)
+    # clean data
+    x.replace([np.inf, -np.inf], np.nan, inplace=True)
+    x.fillna(0, inplace=True)
+    x = x.astype(np.float32)
+    x = x.clip(upper=1e8)
 
-    # Train-test split
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.35, random_state=42, stratify=y
+    # train-test split
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.35, random_state=42, stratify=y
     )
-    return X_train, X_test, y_train, y_test
+    return x_train, x_test, y_train, y_test
 '''
 #All the documentation says that is should be:
 #scale_pos_weight = count(negative examples)/count(Positive examples)
@@ -211,7 +211,7 @@ def train_the_first_stage_model(directory_location:str):
 
             
 
-def prepare_sec_dataset(directory_location:str,created_location:str):
+def segrigate_sec_dataset(directory_location:str,created_location:str):
     # Synth a second dataset with the original one with only the positive attack records 
     file_counter = 0
     if path.isdir(directory_location):
@@ -234,7 +234,7 @@ def prepare_sec_dataset(directory_location:str,created_location:str):
                     # This now gets us the attack records 
                     print(attack_chunk)
                     # We write these chunks to a attack file 
-                    attack_chunk.to_csv(f'created_location/sec_dataset_{file}.csv')
+                    attack_chunk.to_csv(f'{created_location}/sec_dataset_{file}')
                 
                     
 
@@ -242,11 +242,77 @@ def prepare_sec_dataset(directory_location:str,created_location:str):
         else:
             print("The destination directory dosen't exist.....creating the location....")
             makedirs(created_location)
-            prepare_sec_dataset(directory_location,created_location)
+            segrigate_sec_dataset(directory_location,created_location)
     else:
         print("The source dataset location dosen't exist")
         exit()
 
+def verify_sec_datset(directory_location:str):
+    file_counter = 0
+# This funtion will verify whether if segrigated files are actually the positive stuff
+    if path.isdir(directory_location):
+        print("Source path exist")
+        file_name_list = []
+        for (dirpath,dirname,file_name) in walk(directory_location):
+            file_name_list.extend(file_name)
 
-# prepare_sec_dataset("/home/h4r15h/dataset/sniffy/splitted/","/home/h4r15h/dataset/sniffy/splitted_sec/")
-split_csv("/home/h4r15h/dataset/")
+        for file in file_name_list:
+            if file[-3:] == "csv":
+                new_location = f"{directory_location}/{file}"
+                df = pd.read_csv(new_location)
+                all_ones = (df['Label'] == 1).all()                    
+                if all_ones == True:
+                    continue
+                else:
+                    print(f"{file} is not good")
+                # if df["Label"] == 1:
+
+
+
+def prepare_features_second_stage(dataframe):
+    df = dataframe
+    drop_cols = ["IPV4_SRC_ADDR","IPV4_DST_ADDR", "Dataset", "Label"]
+    x = df.drop(columns=drop_cols + ["Attack"])
+    y = df["Attack"]
+
+    # clean data
+    x.replace([np.inf, -np.inf], np.nan, inplace=True)
+    x.fillna(0, inplace=True)
+    x = x.astype(np.float32)
+    x = x.clip(upper=1e8)
+
+    # train-test split
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.25, random_state=42, stratify=y
+    )
+    return x_train, x_test, y_train, y_test
+
+
+
+def train_stage_two(source_location:str):
+    file_counter = 0
+    # This fuction is used for training the second stage model
+    if path.isdir(source_location):
+        print("Source path exist")
+        file_name_list = []
+        for (dirpath,dirname,file_name) in walk(source_location):
+            file_name_list.extend(file_name)
+
+        for file in file_name_list:
+            if file[-3:] == "csv":
+                new_location = f"{source_location}/{file}"
+
+                df = pd.read_csv(new_location,index_col=0)
+                X_train, X_test,y_train, y_test = prepare_features_second_stage(df)
+                print(X_train,X_test,y_train,y_test)
+    
+    else:
+        print("Path don't exist")
+
+
+train_stage_two("/home/h4r15h/dataset/sniffy/splitted_sec")
+
+
+
+        
+
