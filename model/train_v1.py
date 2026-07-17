@@ -205,6 +205,7 @@ def train_the_first_stage_model(directory_location:str):
                 # Cleanup to save RAM
                 del df, X_train, y_train
                 gc.collect()
+                print(f"Garbage collection counts: {gc.get_counts()}")
         joblib.dump(model, "xgb_attack_model.pkl")
         print("\nFinal model exported successfully!")       
 
@@ -230,10 +231,14 @@ def prepare_sec_dataset(directory_location:str,created_location:str):
                     data_chunk = pd.read_csv(new_location)
                     # Now we create a new dataframe based on if it a actual acttack or not 
                     attack_chunk = data_chunk[data_chunk["Label"]==1]
+                    # This now gets us the attack records 
                     print(attack_chunk)
+                    # We write these chunks to a attack file 
+                    attack_chunk.to_csv(f'created_location/sec_dataset_{file}.csv')
+                
                     
 
-            
+        
         else:
             print("The destination directory dosen't exist.....creating the location....")
             makedirs(created_location)
@@ -243,4 +248,5 @@ def prepare_sec_dataset(directory_location:str,created_location:str):
         exit()
 
 
-prepare_sec_dataset("/home/h4r15h/dataset/sniffy/splitted/","/home/h4r15h/dataset/sniffy/splitted_sec/")
+# prepare_sec_dataset("/home/h4r15h/dataset/sniffy/splitted/","/home/h4r15h/dataset/sniffy/splitted_sec/")
+split_csv("/home/h4r15h/dataset/")
