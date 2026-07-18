@@ -304,8 +304,65 @@ def train_stage_two(source_location:str):
 
                 df = pd.read_csv(new_location,index_col=0)
                 X_train, X_test,y_train, y_test = prepare_features_second_stage(df)
-                print(X_train,X_test,y_train,y_test)
+                print(X_train,X_test,y_train,y_test)    
+
+                scale_pos_weight = calc_scale_pos_weight("/home/h4r15h/dataset/sniffy/splitted/")
+                X_train , X_test, y_train, y_test  = prepare_features_second_stage(df)
+                
+                if model is None:
+                # First dataset → create a new model
+                    model = xgb.XGBClassifier(
+                        objective="binary:logistic",
+                        n_estimators=20,
+                        max_depth=6,
+                        learning_rate=0.001,
+                        subsample=0.8,
+                        colsample_bytree=0.8,
+                        scale_pos_weight=scale_pos_weight,
+                        reg_alpha=0.1,
+                        reg_lambda=1,
+                        use_label_encoder=False,
+                        eval_metric="auc",
+                        random_state=42
+                    )
+                    # Train first model
+                    model.fit(X_train, y_train, eval_set=[(X_train, y_train), (X_test, y_test)], verbose=50)
+
+                else:
+                    # Subsequent datasets → continue training
+                    model.fit(
+                        X_train, y_train,
+                        eval_set=[(X_train, y_train), (X_test, y_test)],
+                        xgb_model=model,  # continue from previous model
+                        verbose=50
+                    )
+                    
+
+                y_pred = model.predict(X_test)
+                y_proba = model.predict_proba(X_test)[:, 1]
     
+                acc = accuracy_score(y_test, y_pred)
+                prec = precision_score(y_test, y_pred)
+                rec = recall_score(y_test, y_pred)
+                f1 = f1_score(y_test, y_pred)
+                roc = roc_auc_score(y_test, y_proba)
+                cm = confusion_matrix(y_test, y_pred)
+    
+                print("===== Model Metrics =====")
+                print(f"Accuracy : {acc:.4f}")
+                print(f"Precision: {prec:.4f}")
+                print(f"Recall   : {rec:.4f}")
+                print(f"F1-score : {f1:.4f}")
+                print(f"ROC-AUC  : {roc:.4f}")
+                print("Confusion Matrix:")
+                print(cm)
+                
+                # Cleanup to save RAM
+                del df, X_train, y_train
+                gc.collect()
+                print(f"Garbage collection counts: {gc.get_counts()}")
+        joblib.dump(model, "xgb_attack_model.pkl")
+        print("\nFinal model exported successfully!")       
     else:
         print("Path don't exist")
 
