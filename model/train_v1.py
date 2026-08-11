@@ -367,7 +367,7 @@ def train_stage_two(source_location:str):
         print("Path don't exist")
 
 
-train_stage_two("/home/h4r15h/dataset/sniffy/splitted_sec")
+train_stage_two("/home/h4r15h/dataset/sniffy/splitted")
 
 
 
