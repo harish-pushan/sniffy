@@ -1,3 +1,10 @@
 features.md
-vevn
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+artifacts/
+data/
+*.pcap
+*.csv
 proj/capture.pcap

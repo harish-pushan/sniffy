@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sniffy"
+version = "0.1.0"
+description = "Network-flow capture and two-stage intrusion detection"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "dpkt>=1.9.8",
+    "joblib>=1.3",
+    "matplotlib>=3.7",
+    "netifaces>=0.11",
+    "nfstream>=6.5",
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "pyarrow>=12",
+    "pyshark>=0.6",
+    "scikit-learn>=1.3",
+    "xgboost>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+sniffy-split = "scripts.split_dataset:main"
+sniffy-segregate = "scripts.segregate_attacks:main"
+sniffy-train-stage1 = "scripts.train_stage1:main"
+sniffy-train-stage2 = "scripts.train_stage2:main"
+sniffy-capture = "scripts.capture:main"
+sniffy-predict = "scripts.predict:main"
+
+[tool.setuptools.packages.find]
+include = ["sniffy*", "scripts*"]

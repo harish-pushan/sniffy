@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>sniffy Project Guide</title>
+<style>
+@page {
+  size: A4;
+  margin: 18mm 17mm 20mm;
+  @bottom-left { content: "sniffy | Project Guide"; color: #697586; font-size: 8pt; }
+  @bottom-right { content: "Page " counter(page); color: #697586; font-size: 8pt; }
+}
+:root { color-scheme: light; }
+body { font-family: sans-serif; color: #202b38; font-size: 10pt; line-height: 1.48; }
+h1, h2, h3 { color: #123b5d; line-height: 1.2; }
+h1 { font-size: 28pt; margin: 0 0 8pt; }
+h2 { font-size: 17pt; margin: 20pt 0 8pt; border-bottom: 1px solid #b8c9d7; padding-bottom: 4pt; }
+h3 { font-size: 11.5pt; margin: 13pt 0 5pt; }
+p { margin: 5pt 0 8pt; }
+ul, ol { padding-left: 20pt; margin: 5pt 0 10pt; }
+li { margin: 3pt 0; }
+small, .muted { color: #637285; }
+.cover { min-height: 235mm; display: flex; flex-direction: column; justify-content: center; page-break-after: always; }
+.kicker { color: #b45332; font-size: 10pt; font-weight: bold; text-transform: uppercase; }
+.subtitle { font-size: 15pt; color: #43566b; max-width: 145mm; }
+.rule { width: 100%; border: 0; border-top: 4px solid #123b5d; margin: 14pt 0 20pt; }
+.callout { background: #edf4f8; border-left: 4px solid #24658d; padding: 9pt 12pt; margin: 10pt 0 12pt; }
+.warning { background: #fff5e6; border-left-color: #bd7224; }
+code { font-family: monospace; font-size: 9pt; background: #f0f3f6; padding: 1pt 3pt; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #172331; color: #edf3f8; padding: 10pt 12pt; border-radius: 3pt; font-family: monospace; font-size: 8pt; line-height: 1.35; page-break-inside: avoid; }
+table { width: 100%; border-collapse: collapse; margin: 8pt 0 12pt; font-size: 9pt; }
+thead { display: table-header-group; }
+tr { break-inside: avoid; page-break-inside: avoid; }
+th { background: #e7eef3; color: #123b5d; text-align: left; }
+th, td { border: 1px solid #c8d3dd; padding: 5pt 6pt; vertical-align: top; }
+.section { page-break-before: always; }
+.keep { page-break-inside: avoid; }
+.footer-note { margin-top: 16pt; color: #637285; font-size: 8.5pt; }
+</style>
+</head>
+<body>
+<section class="cover">
+  <div class="kicker">Architecture, cleanup, and training guide</div>
+  <hr class="rule">
+  <h1>sniffy</h1>
+  <p class="subtitle">A practical guide to the cleaned codebase, its two-stage network-flow classifier, and your next step: training the attack-type model.</p>
+  <p><strong>Branch:</strong> <code>decide_if_i_should_change</code><br>
+  <strong>Prepared:</strong> 2026-10-02<br>
+  <strong>Schema:</strong> 46 canonical columns</p>
+  <div class="callout"><strong>Current state:</strong> the package, capture path, and both trainer classes are implemented. The full tests pass. Stage two has not been trained on your labeled dataset yet; the runbook in this guide takes you through that task.</div>
+  <p class="footer-note">This report is a learning guide, not a claim that a production model has already been trained or evaluated.</p>
+</section>
+
+<h2>1. What the project does</h2>
+<p>sniffy converts network traffic into flow-level features, then uses a two-stage XGBoost classifier. Stage one answers <em>benign or attack?</em> Stage two runs for predicted attacks and answers <em>which attack type?</em></p>
+<ol>
+  <li><strong>Capture:</strong> NFStream reads a PCAP or a live interface. Canonical plugins add DNS, ICMP, TTL, packet-size, and TCP-window measurements.</li>
+  <li><strong>Serialize:</strong> <code>FlowStreamProcessor</code> turns each expired flow into a CSV row in canonical schema order.</li>
+  <li><strong>Prepare:</strong> CSV splitting bounds memory; attack segregation copies rows with <code>Label == 1</code> for stage two.</li>
+  <li><strong>Train:</strong> each trainer cleans features, makes a train/test split per chunk, incrementally fits an XGBoost model, records metrics, and writes its own artifact bundle.</li>
+  <li><strong>Predict:</strong> the predictor sends every row through stage one, then sends only predicted attacks through stage two.</li>
+</ol>
+<div class="callout warning"><strong>Ground truth matters:</strong> capture does not know whether traffic is malicious. Use labeled datasets for supervised training. A capture row with blank <code>Label</code> or <code>Attack</code> is not ready for training until it has been labeled.</div>
+
+<h2>2. Clean project structure</h2>
+<pre>sniffy/
+|-- README.md
+|-- docs/
+|   |-- sniffy_project_guide.pdf
+|   `-- sniffy_project_guide.html  # editable source for the guide
+|-- pyproject.toml
+|-- requirements.txt
+|-- capture.py                    # compatibility entrypoint
+|-- sniffy/                       # installable package; canonical logic
+|   |-- config.py                 # portable paths and model defaults
+|   |-- schema.py                 # one ordered 46-column schema
+|   |-- data/
+|   |   |-- loader.py             # recursive scanner and chunk splitter
+|   |   |-- preprocessing.py      # shared feature cleaning and split
+|   |   `-- segregation.py        # Label==1 dataset creation and verification
+|   |-- models/
+|   |   |-- base_trainer.py       # incremental fit, metrics, artifact bundle
+|   |   |-- stage1_trainer.py     # binary Label classifier
+|   |   |-- stage2_trainer.py     # multiclass Attack classifier
+|   |   `-- predictor.py          # stage-one -> stage-two cascade
+|   |-- capture/
+|   |   |-- live_capture.py       # lazy PyShark/NFStream wrappers
+|   |   |-- stream_processor.py   # flow object -> schema-ordered CSV
+|   |   `-- plugins/              # one canonical plugin per feature family
+|   `-- viz/eda.py                # parameterized feature histograms
+|-- scripts/                      # thin CLI entrypoints
+|-- tests/                        # data, capture serialization, model tests
+|-- model/xgb_attack_model.pkl    # preserved legacy single-model artifact
+|-- proj/capture.pcap             # preserved sample traffic
+|-- proj/test/capture.pcap        # preserved sample traffic
+`-- sniffy_project_structure.pdf  # original proposal document</pre>
+<p>The old procedural trainer/capture scripts, duplicated plugin implementations, scratch test scripts, orphaned notebook checkpoints, and their tracked bytecode caches have been removed. PCAPs and the old pickle remain as data/reference; the pickle is <strong>not</strong> interchangeable with the new two-stage artifact bundles.</p>
+
+<h2>3. File tour: where to read first</h2>
+<table>
+<thead><tr><th>File</th><th>Responsibility</th><th>Why it matters</th></tr></thead>
+<tbody>
+<tr><td><code>sniffy/schema.py</code></td><td>Ordered feature names, target names, and stage-specific drop columns.</td><td>All CSV production, preprocessing, and model feature selection should agree with this one list.</td></tr>
+<tr><td><code>sniffy/config.py</code></td><td><code>Paths</code> derives data/artifact paths from environment variables; <code>TrainerHyperparameters</code> holds model defaults.</td><td>Use this instead of machine-specific absolute paths.</td></tr>
+<tr><td><code>sniffy/data/loader.py</code></td><td><code>DirectoryScanner</code> finds sorted CSVs recursively; <code>DatasetSplitter</code> writes chunks in schema order.</td><td>Training discovers files here, so filenames and directory layout affect iteration order.</td></tr>
+<tr><td><code>sniffy/data/preprocessing.py</code></td><td>Drops metadata/target columns, converts features to numeric, replaces infinities/missing values, clips values, and splits train/test.</td><td>Stage-one and stage-two differences are configuration, not copy-pasted logic.</td></tr>
+<tr><td><code>sniffy/data/segregation.py</code></td><td>Writes attack-only rows and verifies every written <code>Label</code> is 1.</td><td>It does not invent or validate attack-type names. Those must already be in <code>Attack</code>.</td></tr>
+<tr><td><code>sniffy/models/base_trainer.py</code></td><td>Counts classes, loops through CSV chunks, warm-starts XGBoost, calculates metrics, and saves a model/classes/features bundle.</td><td>This is the main training control flow shared by both stages.</td></tr>
+<tr><td><code>sniffy/models/stage1_trainer.py</code></td><td>Binary logistic objective, AUC evaluation, and negative/positive class weighting.</td><td>Target is numeric <code>Label</code> with values 0 and 1.</td></tr>
+<tr><td><code>sniffy/models/stage2_trainer.py</code></td><td>Multiclass soft-probability objective and class-balanced sample weights.</td><td>Target is <code>Attack</code>; class names are encoded for XGBoost and saved for decoding later.</td></tr>
+<tr><td><code>sniffy/models/predictor.py</code></td><td>Loads both bundles, aligns features to the saved feature order, and cascades predictions.</td><td>Stage two is called only for rows stage one marks as attacks.</td></tr>
+<tr><td><code>sniffy/capture/plugins/*.py</code></td><td>Feature hooks that store custom values on NFStream's <code>flow.udps</code>.</td><td>These are the only plugin implementations to extend going forward.</td></tr>
+<tr><td><code>sniffy/capture/stream_processor.py</code></td><td>Maps flow attributes/custom values into every schema column and appends rows to CSV.</td><td>Missing flow/plugin fields receive defaults; labels are caller-provided.</td></tr>
+<tr><td><code>scripts/*.py</code></td><td>Argument parsing and composition of package classes.</td><td>Keep business logic in <code>sniffy/</code>; command modules should remain thin.</td></tr>
+</tbody>
+</table>
+
+<h2>4. Your next task: train stage two</h2>
+<h3>Input contract</h3>
+<p>The source data needs the canonical columns, including numeric <code>Label</code> values 0/1 and a nonempty <code>Attack</code> class for attack rows. Stage two is trained only on rows where <code>Label == 1</code>. There must be at least two distinct attack classes in the training corpus.</p>
+<h3>Run the pipeline</h3>
+<pre>source .venv/bin/activate
+
+# Split a labeled source CSV into bounded-size files.
+sniffy-split /path/to/labeled_dataset.csv data/splitted --chunksize 500000
+
+# Optional if you still need the binary detector.
+sniffy-train-stage1 data/splitted --artifact artifacts/stage1/xgb_v1.pkl
+
+# Build the attack-only data and verify Label == 1.
+sniffy-segregate data/splitted data/attacks
+
+# Train and save the multiclass attack-type model.
+sniffy-train-stage2 data/attacks --artifact artifacts/stage2/xgb_v1.pkl
+
+# Use both artifacts after stage one and stage two are trained.
+sniffy-predict /path/to/flows.csv \
+  --stage1 artifacts/stage1/xgb_v1.pkl \
+  --stage2 artifacts/stage2/xgb_v1.pkl \
+  --output predictions.csv</pre>
+<p>If stage one is already trained and its artifact is available, you can skip its training command. Stage two training itself does not load stage one; it only needs the attack-only CSVs.</p>
+<h3>Important chunk limitation</h3>
+<p><code>fit_directory</code> reads up to 500,000 rows per training chunk. <code>FeaturePreprocessor.transform</code> currently requires at least two target classes in every processed chunk. The multiclass classifier also needs the classes represented in its training split. If each source file or chunk contains only one attack type, stage-two training can fail even though the directory as a whole contains multiple types.</p>
+<p>Before training, inspect the generated files/chunks. If attack types are grouped, create shuffled/interleaved stage-two chunks that include all required classes, or update the trainer to buffer across files before training. Do not silently label a single attack type as another class.</p>
+<pre>from pathlib import Path
+import pandas as pd
+
+for csv_path in sorted(Path("data/attacks").glob("*.csv")):
+    print(csv_path.name)
+    for chunk_number, chunk in enumerate(
+        pd.read_csv(csv_path, usecols=["Attack"], chunksize=500_000)
+    ):
+        counts = chunk["Attack"].dropna().value_counts()
+        print(" ", chunk_number, counts.to_dict())</pre>
+<p>Investigate any chunk with fewer than two classes, missing attack labels, or too few rows for the configured 25% test split. The training code reports per-chunk metrics in the returned trainer object and logs them; the CLI prints those metric dictionaries.</p>
+
+<h2>5. Understand the two model stages</h2>
+<table>
+<thead><tr><th>Stage</th><th>Target</th><th>Features excluded</th><th>Model / artifact</th></tr></thead>
+<tbody>
+<tr><td>1: detection</td><td><code>Label</code> (0 benign, 1 attack)</td><td>Source/destination IP, <code>Dataset</code>, <code>Attack</code>, and target <code>Label</code></td><td><code>binary:logistic</code>; <code>artifacts/stage1/xgb_v1.pkl</code></td></tr>
+<tr><td>2: attack type</td><td><code>Attack</code> (for attack rows only)</td><td>Source/destination IP, <code>Dataset</code>, <code>Label</code>, and target <code>Attack</code></td><td><code>multi:softprob</code>; <code>artifacts/stage2/xgb_v1.pkl</code></td></tr>
+</tbody>
+</table>
+<p>The base trainer discovers CSVs in sorted order, computes global class counts from the configured source directory, fits one classifier, then warm-starts its booster for later chunks. Metrics include accuracy, precision, recall, F1, and a confusion matrix; ROC-AUC is populated for the binary stage. Each artifact is a joblib bundle containing the XGBoost estimator, stage-two class labels (when applicable), and exact feature order.</p>
+<p>For a prediction row, stage one predicts the binary label. Benign rows return <code>benign</code>; positive rows are transformed to stage-two features, classified, and decoded back to the original attack label. If stage-one confidence/recall is poor, stage two never gets a chance to recover that missed attack.</p>
+
+<h2>6. Capture and labeling</h2>
+<p>Capture uses <code>PacketCapturer.stream_flows</code>, which constructs <code>NFStreamer</code> with the canonical plugin instances. <code>FlowStreamProcessor.process</code> consumes expired flows and appends one schema-ordered CSV row per flow. The PyShark packet wrapper is available for packet-level capture; the main flow CSV command uses NFStream because the ML features are flow aggregates.</p>
+<pre>sniffy-capture --interface wlan0 --output data/capture.csv
+
+# Add labels only when they are actually known:
+sniffy-capture --interface wlan0 --label 1 --attack scan \\
+  --output data/labeled_capture.csv</pre>
+<p>Default paths are rooted at the current directory or <code>SNIFFY_HOME</code>. Override dataset, split, attack, artifact, and capture paths with <code>SNIFFY_DATASET</code>, <code>SNIFFY_SPLIT_DIR</code>, <code>SNIFFY_ATTACK_DIR</code>, <code>SNIFFY_ARTIFACT_DIR</code>, and <code>SNIFFY_CAPTURE_CSV</code>. Live capture requires an interface that exists and OS-level permissions; PyShark additionally requires system <code>tshark</code>.</p>
+<div class="callout"><strong>Verified here:</strong> PyShark decoded a packet from <code>proj/capture.pcap</code>; NFStreamer processed that PCAP and the writer persisted 31 flows with 46 columns. This verifies the offline PCAP path, not live interface permissions.</div>
+
+<h2>7. Tests and troubleshooting</h2>
+<ul>
+  <li>Run the focused suite: <code>.venv/bin/python -m unittest discover -s tests -v</code>.</li>
+  <li><strong>Missing target:</strong> check exact column capitalization: <code>Label</code> and <code>Attack</code>.</li>
+  <li><strong>No attack rows:</strong> verify the source <code>Label</code> values are numeric 1, not strings or a different encoding.</li>
+  <li><strong>Stage two says one class:</strong> check attack labels and per-chunk distributions; there must be multiple distinct attack names.</li>
+  <li><strong>Feature mismatch at prediction:</strong> use the same canonical schema; the predictor aligns to saved feature names and fills missing values with zero, but it cannot correct semantically different features.</li>
+  <li><strong>Capture import works but capture fails:</strong> check interface name, <code>tshark</code>, packet-capture privileges, and NFStream's source support.</li>
+  <li><strong>Old pickle:</strong> <code>model/xgb_attack_model.pkl</code> predates the new bundles and may contain only one stage. Train the new stage artifacts before using <code>sniffy-predict</code>.</li>
+</ul>
+<p>The current tests cover schema consistency and capitalization, splitting all chunks, attack-only segregation and verification, flow serialization, and a synthetic two-stage train/predict integration test. They do not establish model quality on your dataset; inspect metrics and class distributions after training.</p>
+
+<h2>8. Cleanup and preserved files</h2>
+<p>Removed obsolete code: the duplicated <code>model/</code> trainers/helpers, the old <code>proj/classes/</code> plugin copies, old capture entrypoints, scratch files under <code>proj/test/</code>, notebook checkpoints, and tracked bytecode caches. Their responsibilities now have one canonical home in <code>sniffy/</code>.</p>
+<p>Preserved deliberately: <code>proj/capture.pcap</code>, <code>proj/test/capture.pcap</code>, <code>model/xgb_attack_model.pkl</code>, the original proposal <code>sniffy_project_structure.pdf</code>, and VS Code settings. The removed scratch scripts and checkpoints had no references from the canonical package, scripts, or tests.</p>
+<p class="footer-note">Keep new application logic in <code>sniffy/</code>, command wiring in <code>scripts/</code>, and behavioral checks in <code>tests/</code>. When extending the model, update the canonical schema only once and add a small test that protects the data contract.</p>
+</body>
+</html>
